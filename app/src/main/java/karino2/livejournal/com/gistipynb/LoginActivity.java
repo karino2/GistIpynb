@@ -1,5 +1,7 @@
 package karino2.livejournal.com.gistipynb;
 
+import android.content.Context;
+import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
@@ -33,6 +35,37 @@ public class LoginActivity extends AppCompatActivity {
         super.onCreate(icicle);
         setContentView(R.layout.activity_login);
 
+        Intent intent = getIntent();
+        if(intent != null) {
+            if(intent.getAction() == Intent.ACTION_MAIN) {
+                getPrefs()
+                        .edit()
+                        .remove("uri_arg")
+                        .commit();
+            } else if (intent.getAction() == Intent.ACTION_SEND) {
+                Uri uri = (Uri) intent.getParcelableExtra(Intent.EXTRA_STREAM);
+                if (uri == null) {
+                    showMessage("not supported. getParcelableExtra fail.");
+                    finish();
+                    return;
+                }
+                /*
+                Log.d("GistIpynb", "path:" + uri.getPath());
+                Log.d("GistIpynb", "uri:" + uri.toString());
+                showMessage(uri.getPath());
+                */
+                getPrefs()
+                        .edit()
+                        .putString("uri_arg", uri.toString())
+                        .commit();
+
+                // uri.getPath()
+                // store this uri and send to UploaderActivity later.
+
+
+            }
+
+        }
 
 
         webView = (WebView)findViewById(R.id.webview);
@@ -71,7 +104,7 @@ public class LoginActivity extends AppCompatActivity {
             @Override
             public void onReady(String responseText) {
                 // auth token. store it here and goto next activity.
-                getSettingsPrefs()
+                getPrefs()
                         .edit()
                         .putString("access_token", responseText)
                         .commit();
@@ -86,13 +119,28 @@ public class LoginActivity extends AppCompatActivity {
         })).execute();
     }
 
-    private SharedPreferences getSettingsPrefs() {
-        return getSharedPreferences("settings", MODE_PRIVATE);
+    private SharedPreferences getPrefs() {
+        return getAppPreferences(this);
     }
 
+    public static SharedPreferences getAppPreferences(Context ctx) {
+        return ctx.getSharedPreferences("prefs", MODE_PRIVATE);
+    }
+
+    public static String getAccessTokenFromPreferences(SharedPreferences prefs) {
+        return prefs.getString("access_token", "");
+    }
+
+    public static String getUriArgFromPreferences(SharedPreferences prefs) {
+        return prefs.getString("uri_arg", "");
+    }
+
+    public String getAccessToken() {
+        return getAccessTokenFromPreferences(getPrefs());
+    }
 
     void checkValidTokenAndGotoTopIfValid() {
-        String accToken = getSettingsPrefs().getString("access_token", "");
+        String accToken = getAccessToken();
         if(accToken.equals("")) {
             // not valid.
             webView.loadUrl(getAuthorizeUrl());
@@ -117,18 +165,24 @@ public class LoginActivity extends AppCompatActivity {
     }
 
     private void gotoTopActivity() {
-        showMessage("gotoTopActivity: NYI");
+        String urival = getUriArgFromPreferences(getPrefs());
+        if(urival.equals("")) {
+            showMessage("Please use this app by sending ipynb file.");
+            finish();
+            return;
+        }
+
+        Intent intent = new Intent(this, UploaderActivity.class);
+        intent.setAction(Intent.ACTION_SEND);
+        intent.putExtra("uri_arg", urival);
+        startActivity(intent);
+        finish();
     }
 
     void showMessage(String msg) {
-        Toast.makeText(this, msg, Toast.LENGTH_SHORT).show();
+        Toast.makeText(this, msg, Toast.LENGTH_LONG).show();
     }
 
-
-    public interface OnContentReadyListener {
-        void onReady(String responseText);
-        void onFail(String message);
-    }
 
     class CheckTokenValidity extends AsyncTask<Object, String, Boolean> {
         OnContentReadyListener resultListener;
@@ -149,6 +203,9 @@ public class LoginActivity extends AppCompatActivity {
                 URL u = new URL(url);
                 HttpURLConnection connection = (HttpURLConnection)u.openConnection();
                 try {
+
+                    connection.setRequestProperty("Authorization", "token " + accessToken);
+                    connection.setUseCaches(false);
 
                     if(HttpURLConnection.HTTP_OK == connection.getResponseCode())
                         return true;
@@ -176,6 +233,23 @@ public class LoginActivity extends AppCompatActivity {
         }
     }
 
+    public static String readAll(InputStream is) throws IOException {
+        BufferedReader reader;
+        reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
+        StringBuilder builder = new StringBuilder();
+        String line = reader.readLine();
+        boolean first = true;
+        while (line != null) {
+            if (!first)
+                builder.append("\n");
+            first = false;
+            builder.append(line);
+            line = reader.readLine();
+        }
+        return builder.toString();
+    }
+
+
     class GetAccessTokenTask extends AsyncTask<Object, String, Boolean> {
 
         OnContentReadyListener resultListener;
@@ -192,21 +266,6 @@ public class LoginActivity extends AppCompatActivity {
         String responseText = null;
         String errorMessage = null;
 
-        String readBody(InputStream is) throws IOException {
-            BufferedReader reader;
-            reader = new BufferedReader(new InputStreamReader(is, "UTF-8"));
-            StringBuilder builder = new StringBuilder();
-            String line = reader.readLine();
-            boolean first = true;
-            while (line != null) {
-                if (!first)
-                    builder.append("\n");
-                first = false;
-                builder.append(line);
-                line = reader.readLine();
-            }
-            return builder.toString();
-        }
 
 
         class AuthenticationJson {
@@ -229,8 +288,8 @@ public class LoginActivity extends AppCompatActivity {
                     connection.setDoInput(true);
                     connection.setDoOutput(true);
 
-                    String body = readBody(connection.getInputStream());
-                    Log.d("GistIpynb", body);
+                    String body = readAll(connection.getInputStream());
+                    // Log.d("GistIpynb", body);
 
                     Gson gson = new Gson();
 
