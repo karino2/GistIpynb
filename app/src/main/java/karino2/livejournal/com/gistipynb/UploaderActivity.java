@@ -1,9 +1,12 @@
 package karino2.livejournal.com.gistipynb;
 
+import android.app.NotificationManager;
+import android.app.PendingIntent;
 import android.content.Intent;
 import android.content.SharedPreferences;
 import android.net.Uri;
 import android.os.AsyncTask;
+import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
 import android.widget.CheckBox;
@@ -85,7 +88,13 @@ public class UploaderActivity extends AppCompatActivity {
                 @Override
                 public void onReady(String responseText) {
                     // should be notification.
-                    showMessage("url: " + responseText);
+                    Uri uri = Uri.parse(responseText);
+                    String id = uri.getLastPathSegment();
+                    String gistUrl = "https://gist.github.com/" + id;
+
+                    // showMessage("url: " + gistUrl);
+                    showUrlNotification(gistUrl);
+                    finish();
                 }
 
                 @Override
@@ -98,6 +107,30 @@ public class UploaderActivity extends AppCompatActivity {
         } catch (IOException e) {
             e.printStackTrace();
         }
+    }
+
+    final int NOTIFICATION_ID = 1;
+
+    private void showUrlNotification(String url) {
+        // .setSmallIcon(R.drawable.notification_icon)
+        NotificationCompat.Builder builder =
+                new NotificationCompat.Builder(this)
+                        .setSmallIcon(R.mipmap.ic_launcher)
+                        .setContentTitle("GistIpynb")
+                        .setContentText(url);
+
+        Intent intent = new Intent(this, CopyUrlReceiver.class);
+        intent.putExtra("result_url", url);
+
+        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        // builder.addAction(android.R.drawable.ic_menu_edit, "Copy", pendingIntent);
+        builder.setContentIntent(pendingIntent);
+
+        NotificationManager notificationManager =
+                (NotificationManager) getSystemService(NOTIFICATION_SERVICE);
+        notificationManager.notify(NOTIFICATION_ID, builder.build());
+
+
     }
 
     String getUriArg() {
