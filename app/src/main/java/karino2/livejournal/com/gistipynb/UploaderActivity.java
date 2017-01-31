@@ -54,6 +54,9 @@ public class UploaderActivity extends AppCompatActivity {
             postGist();
         });
 
+        findViewById(R.id.buttonFillLast).setOnClickListener(v -> {
+            ((EditText)findViewById(R.id.editTextUrl)).setText(getPrefs().getString("last_url", ""));
+        });
 
 
 
@@ -75,6 +78,15 @@ public class UploaderActivity extends AppCompatActivity {
         String fileName = getTextFromET(R.id.editTextFilePath);
         String description = getTextFromET(R.id.editTextDescription);
         boolean isPublic = ((CheckBox)findViewById(R.id.checkBoxPublic)).isChecked();
+        String updateUrl = getTextFromET(R.id.editTextUrl);
+
+        String id;
+
+        if(updateUrl.equals("")) {
+            id = "";
+        } else {
+            id = Uri.parse(updateUrl).getLastPathSegment();
+        }
 
 
         String accToken = getAccessToken();
@@ -84,7 +96,9 @@ public class UploaderActivity extends AppCompatActivity {
 
             String json = toJsonString(description, isPublic, fileName, content);
 
-            JsonPoster poster = new JsonPoster(accToken, json, new OnContentReadyListener() {
+
+
+            JsonPoster poster = new JsonPoster(accToken, json, id, new OnContentReadyListener() {
                 @Override
                 public void onReady(String responseText) {
                     // should be notification.
@@ -121,6 +135,9 @@ public class UploaderActivity extends AppCompatActivity {
 
         Intent intent = new Intent(Intent.ACTION_VIEW);
         intent.setData(Uri.parse(url));
+        getPrefs().edit()
+                .putString("last_url", url)
+                .commit();
 
         PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         // builder.addAction(android.R.drawable.ic_menu_edit, "Copy", pendingIntent);
@@ -158,8 +175,12 @@ public class UploaderActivity extends AppCompatActivity {
         String accessToken;
         String jsonData;
 
-        JsonPoster(String accToken, String jsonData, OnContentReadyListener listener) {
-            url = "https://api.github.com/gists";
+        JsonPoster(String accToken, String jsonData, String id, OnContentReadyListener listener) {
+            if(id.equals(""))
+                url = "https://api.github.com/gists";
+            else
+                url = "https://api.github.com/gists/" + id;
+
             accessToken = accToken;
             this.jsonData = jsonData;
             this.resultListener = listener;
@@ -190,8 +211,14 @@ public class UploaderActivity extends AppCompatActivity {
                     }
 
 
-                    if (HttpURLConnection.HTTP_CREATED == connection.getResponseCode()) {
+                    if (HttpURLConnection.HTTP_CREATED == connection.getResponseCode()) // new
+                    {
                         responseText = connection.getHeaderField("Location");
+                        return true;
+                    }
+                    if(HttpURLConnection.HTTP_OK == connection.getResponseCode()) // edit
+                    {
+                        responseText = url;
                         return true;
                     }
 
