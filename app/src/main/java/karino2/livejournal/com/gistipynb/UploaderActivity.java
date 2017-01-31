@@ -119,10 +119,10 @@ public class UploaderActivity extends AppCompatActivity {
                         .setContentTitle("GistIpynb")
                         .setContentText(url);
 
-        Intent intent = new Intent(this, CopyUrlReceiver.class);
-        intent.putExtra("result_url", url);
+        Intent intent = new Intent(Intent.ACTION_VIEW);
+        intent.setData(Uri.parse(url));
 
-        PendingIntent pendingIntent = PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
+        PendingIntent pendingIntent = PendingIntent.getActivity(this, 0, intent, PendingIntent.FLAG_UPDATE_CURRENT);
         // builder.addAction(android.R.drawable.ic_menu_edit, "Copy", pendingIntent);
         builder.setContentIntent(pendingIntent);
 
