@@ -9,6 +9,8 @@ import android.os.AsyncTask;
 import android.support.v4.app.NotificationCompat;
 import android.support.v7.app.AppCompatActivity;
 import android.os.Bundle;
+import android.view.Menu;
+import android.view.MenuItem;
 import android.widget.CheckBox;
 import android.widget.EditText;
 import android.widget.Toast;
@@ -50,16 +52,44 @@ public class UploaderActivity extends AppCompatActivity {
             ((EditText)findViewById(R.id.editTextFilePath)).setText(file.getName());
         }
 
-        findViewById(R.id.buttonPost).setOnClickListener((v)-> {
-            postGist();
-        });
-
         findViewById(R.id.buttonFillLast).setOnClickListener(v -> {
             ((EditText)findViewById(R.id.editTextUrl)).setText(getPrefs().getString("last_url", ""));
         });
 
 
 
+    }
+
+    @Override
+    public boolean onCreateOptionsMenu(Menu menu) {
+        getMenuInflater().inflate(R.menu.menu_uploader, menu);
+        return super.onCreateOptionsMenu(menu);
+    }
+
+    boolean duringPost = false;
+
+    @Override
+    public boolean onPrepareOptionsMenu(Menu menu) {
+        ((MenuItem)menu.findItem(R.id.menu_item_post)).setEnabled(!duringPost);
+        return super.onPrepareOptionsMenu(menu);
+    }
+
+    @Override
+    public boolean onOptionsItemSelected(MenuItem item) {
+        switch(item.getItemId()) {
+            case R.id.menu_item_post:
+                showMessage("Posting...");
+                duringPost = true;
+                invalidateOptionsMenu();
+                postGist();
+                break;
+        }
+        return super.onOptionsItemSelected(item);
+    }
+
+    void notifySendFinish() {
+        duringPost = false;
+        invalidateOptionsMenu();
     }
 
     String getTextFromET(int rid) {
@@ -108,12 +138,15 @@ public class UploaderActivity extends AppCompatActivity {
 
                     // showMessage("url: " + gistUrl);
                     showUrlNotification(gistUrl);
+                    notifySendFinish();
+                    showMessage("Done");
                     finish();
                 }
 
                 @Override
                 public void onFail(String message) {
                     showMessage("post fail: " + message);
+                    notifySendFinish();
                 }
             });
             poster.execute();
